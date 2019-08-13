@@ -1,0 +1,16 @@
+name = "wiktionary"
+uuid = "05403bde-b06e-11e9-376a-45b308480095"
+authors = ["Gregor Kappler <gregor.kappler@bictxt.de>"]
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+FilingForest = "84ac4afa-e505-11e8-3443-496a51703dc2"
+IndexedTables = "6deec6e2-d858-57c5-ab9b-e6ca5bd20e43"
+JuliaDB = "a93385a2-3734-596a-9a66-3cfbb77141e6"
+LibExpat = "522f3ed2-3f36-55e3-b6df-e94fee9b0c07"
+ProfileView = "c46f51b8-102a-5cf2-8d2c-8597cb0e0da7"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+TableAlchemy = "0c6a60aa-ac64-11e9-39b9-f764e219cf0a"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
