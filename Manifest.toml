@@ -514,6 +514,12 @@ git-tree-sha1 = "d52799152697059353a8eac1000d32ba8d92aa25"
 uuid = "f9f48841-c794-520a-933b-121f7ba6ed94"
 version = "0.2.0"
 
+[[Memoize]]
+deps = ["Test"]
+git-tree-sha1 = "d9683969337ad20dc957122038bd2c0ead4b5209"
+uuid = "c03570c3-d221-55d1-a50c-7939bbd78826"
+version = "0.3.0"
+
 [[Missings]]
 deps = ["SparseArrays", "Test"]
 git-tree-sha1 = "f0719736664b4358aa9ec173077d4285775f8007"
@@ -837,7 +843,7 @@ uuid = "7522ee7d-7047-56d0-94d9-4bc626e7058d"
 version = "0.2.0"
 
 [[TableAlchemy]]
-deps = ["Dagger", "DataStructures", "IndexedTables", "JuliaDB", "Tables"]
+deps = ["Dagger", "DataStructures", "IndexedTables", "JuliaDB", "Memoize", "Tables"]
 path = "../TableAlchemy"
 uuid = "0c6a60aa-ac64-11e9-39b9-f764e219cf0a"
 version = "0.1.0"
@@ -883,9 +889,9 @@ uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 version = "0.9.2"
 
 [[Tokenize]]
-git-tree-sha1 = "c8a8b00ae44a94950814ff77850470711a360225"
+git-tree-sha1 = "dfcdbbfb2d0370716c815cbd6f8a364efb6f42cf"
 uuid = "0796e94c-ce3b-5d07-9a54-7f471281c624"
-version = "0.5.5"
+version = "0.5.6"
 
 [[TranscodingStreams]]
 deps = ["Random", "Test"]
