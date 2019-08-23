@@ -135,26 +135,6 @@ end
 
 typed_data=collect_target_types(db_channel,cache_size)
 
-if false
-    v = Union{String,Int}["1",2,4,"2",5,8,"g","a"]
-    v_=(("test",x) for x in repeat(v,10000))
-    x=collect_target_types(v_)
-    x()
-    f(vv)=for x=collect_target_types(vv)
-        x
-    end
-    ##
-    @time f(v_)
-    using Profile
-    using ProfileView
-    ##
-    Profile.clear(); @profile f(v_)
-    ProfileView.view()
-end
-#####
-
-
-(target,v) = typed_data()
 
 for (target,v) in typed_data
     @db_name eltype(v) target
@@ -166,42 +146,3 @@ for (target,v) in typed_data
 end
 
 save(results)
-
-## manifest_row(t, typeof(RM[1]); word="Hallo", order="[1]")
-
-# using LibGit2
-# author = LibGit2.Signature("James Imnab", "james@bictxt.de")
-# wiki_git = expanduser("~/tmp/wiktionary.git")
-# mkpath(wiki_git)
-# repo = LibGit2.init(wiki_git)
-# @time parse_bz2() do val, counter
-#     wait_onwarn = false
-#     commit_threshold = 100
-#     pathfile = split( val.title, ":")
-#     # if length(pathfile)==1
-#     #     pathfile = ["Wiktionary"]
-#     # end
-#     file=pathfile[end]
-#     relpath = String[]
-#     i=firstindex(file)
-#     while length(relpath)<3 && i <= lastindex(file)
-#         push!(relpath, lowercase(string(file[i])))
-#     end
-#     file = joinpath(wiki_git,pathfile[1:end-1]...,relpath...,"$file.wiki")
-#     mkpath(dirname(file))
-#     # @show val.revision.text
-#     open(file,"w") do io
-#         print(io, val.revision.text)
-#     end
-#     LibGit2.add!(repo, file)
-#     if counter % commit_threshold == 0
-#         @info "commit...."
-#         LibGit2.commit(repo, "incremental wiktionary commit"; author = author)
-#         counter = 0
-#     end
-#     if false
-#     end
-#     ## print(val.revision.text)
-# end
-
-
