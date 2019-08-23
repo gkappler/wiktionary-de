@@ -10,12 +10,15 @@ using Distributed
 ## addprocs(1)
 @info "using $(nprocs()) prcs $(nworkers()) workers"
 
+@everywhere    using Pkg
+@everywhere    Pkg.activate("wiktionary")
+@everywhere    Pkg.resolve()
+@everywhere    Pkg.instantiate()
+
 @everywhere begin
     println("loading TableAlchemy")
     cd(expanduser("~/dev/julia/"))
     using Pkg
-    Pkg.activate("wiktionary")
-    Pkg.instantiate()
     using TableAlchemy
     ##using Test
     ##using BenchmarkTools
@@ -41,14 +44,12 @@ cache_size = 1000
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
 
-errorfile = joinpath(expanduser("~"),"ParserAlchemy.err")
+@everywhere errorfile = joinpath(expanduser("~"),"ParserAlchemy.err")
 open(errorfile,"w") do io
 end
 @everywhere begin
     println("loading FilingForest")
     cd(expanduser("~/dev/julia/"))
-    using Pkg
-    Pkg.activate("wiktionary")
     using FilingForest
     using FilingForest.Parser
     using FilingForest.OrgParser
