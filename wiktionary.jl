@@ -71,16 +71,24 @@ end
 @info "start loading"
 
 wc=mc=0
-read_task = @async parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
-    # open("lastwiki.wiki","w") do io
-    #     print(io, val.revision.text)
-    # end
-    global wc, mc
-    ProgressMeter.next!(prog; showvalues=[(:word, val.title) ])
-    put!(inbox, val)
-    sleep(sleep_time)
+read_task = @async begin
+    try
+    parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
+        global wc, mc
+        ProgressMeter.next!(prog; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
+        put!(inbox, val)
+        sleep(sleep_time)
+    end
+    catch e
+        @error "xml parsing" exception=e
+    end
+    close(inbox)
+    while isready(inbox) || isready(db_channel)
+        sleep(1)
+    end
+    close(db_channel)
 end
-#bind(inbox, read_task)
+## bind(inbox, read_task) ## close inbox when reading is done
 
 #parse_task = @async
 ## nextchunk(inbox, words, meanings)
@@ -107,13 +115,15 @@ mkpath(output)
 results = TypeDB(output)
 
 
-
+show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
+    "$w$m"
+end
 using ResumableFunctions
 @resumable function collect_target_types(c, size=2)
     d = Dict{Tuple{String,Type},TableAlchemy.VectorCache}()
-    while isopen(c)
+    while isready(c) || isopen(c)
         (target,x) = take!(c)
-        ProgressMeter.next!(dprog; showvalues=[(:target, target), (:data,x.word) ])
+        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem, Sys.free_memory()/10^6) ])
         ##@show x=take!(c)
         let T=typeof(x) 
             v=get!(() -> TableAlchemy.VectorCache{T}(undef, size),
