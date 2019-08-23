@@ -18,7 +18,7 @@ using Distributed
     Pkg.instantiate()
     using TableAlchemy
     ##using Test
-    using BenchmarkTools
+    ##using BenchmarkTools
     ##using Glob
     ##using JuliaDB
     println("worker ready")
@@ -41,8 +41,9 @@ cache_size = 1000
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
 
-
-
+errorfile = joinpath(expanduser("~"),"ParserAlchemy.err")
+open(errorfile,"w") do io
+end
 @everywhere begin
     println("loading FilingForest")
     cd(expanduser("~/dev/julia/"))
@@ -57,7 +58,7 @@ db_channel = RemoteChannel(()->Channel(cache_size*10))
         while isopen(inbox)
             try
                 @info "compiling" maxlog=1
-                wikichunks(inbox, db_channel)
+                wikichunks(inbox, db_channel; errorfile=errorfile)
                 @info "compiling done" maxlog=1
             catch e
                 @warn "cannot parse meanings in wiktionary" e
