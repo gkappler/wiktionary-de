@@ -118,7 +118,7 @@ results = TypeDB(output)
 
 show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     r = "$w$m"
-    r[1:min(end,nextind(r,60))]
+    r[1:nextind(r,min(lastindex(r),60))]
 end
 using ResumableFunctions
 @resumable function collect_target_types(c, size=2)
