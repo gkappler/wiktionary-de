@@ -71,7 +71,7 @@ end
 @info "start loading"
 
 wc=mc=0
-read_task = @async parse_bz2() do val, counter
+read_task = @async parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
     # open("lastwiki.wiki","w") do io
     #     print(io, val.revision.text)
     # end
