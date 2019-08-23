@@ -118,7 +118,11 @@ results = TypeDB(output)
 
 show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     r = "$w$m"
-    r[1:nextind(r,min(lastindex(r),60))]
+    if lastindex(r)>60        
+        r[1:nextind(r,60)]
+    else
+        r
+    end
 end
 using ResumableFunctions
 @resumable function collect_target_types(c, size=2)
@@ -147,14 +151,17 @@ end
 
 typed_data=collect_target_types(db_channel,cache_size)
 
-
 for (target,v) in typed_data
     @db_name eltype(v) target
     @db_autoindex eltype(v)
     @pkeys eltype(v) (:word, :numid)
-    TableAlchemy.push_pkeys!(
-        results,
-        TableAlchemy.joining_key_values(results, emptykeys(v), v));
+    try
+        TableAlchemy.push_pkeys!(
+            results,
+            TableAlchemy.joining_key_values(results, emptykeys(v), v));
+    catch e
+        @error "cannot push into db" exception=e
+    end
 end
 
 save(results)
