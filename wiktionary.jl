@@ -40,7 +40,7 @@ prog = ProgressUnknown("Wiktionary indexing:")
 dprog = ProgressUnknown("data:")
 
 cache_size = 1000
-@everywhere sleep_time = .01
+@everywhere sleep_time = .001
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
 
