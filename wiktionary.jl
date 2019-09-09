@@ -14,16 +14,10 @@ using Distributed
 @everywhere    Pkg.activate("wiktionary")
 @everywhere    Pkg.resolve()
 @everywhere    Pkg.instantiate()
-
 @everywhere begin
     println("loading TableAlchemy")
     cd(expanduser("~/dev/julia/"))
-    using Pkg
     using TableAlchemy
-    ##using Test
-    ##using BenchmarkTools
-    ##using Glob
-    ##using JuliaDB
     println("worker ready")
 end
 
@@ -39,7 +33,7 @@ using ProgressMeter
 prog = ProgressUnknown("Wiktionary indexing:")
 dprog = ProgressUnknown("data:")
 
-cache_size = 1000
+cache_size = 100
 @everywhere sleep_time = .001
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
@@ -62,7 +56,7 @@ end
                 wikichunks(inbox, db_channel; errorfile=errorfile)
                 @info "compiling done" maxlog=1
             catch e
-                @warn "cannot parse meanings in wiktionary" e
+                @warn "cannot parse meanings in wiktionary" exception=e
             end
             sleep(sleep_time)
         end
@@ -76,8 +70,7 @@ wc=mc=0
 read_task = @async begin
     try
     parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
-        global wc, mc
-        ProgressMeter.next!(prog; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
+        ## ProgressMeter.next!(prog; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
         put!(inbox, val)
         sleep(sleep_time)
     end
@@ -93,7 +86,7 @@ end
 ## bind(inbox, read_task) ## close inbox when reading is done
 
 #parse_task = @async
-## nextchunk(inbox, words, meanings)
+## nextchunk(inbox, db_channel)
 for p in workers()## [1:end-1]
     remote_do(nextchunk, p, inbox, db_channel)
 end
@@ -164,4 +157,4 @@ for (target,v) in typed_data
     end
 end
 
-save(results)
+TableAlchemy.save(results)
