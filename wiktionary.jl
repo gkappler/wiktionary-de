@@ -147,7 +147,9 @@ typed_data=collect_target_types(db_channel,cache_size)
 for (target,v) in typed_data
     @db_name eltype(v) target
     @db_autoindex eltype(v)
-    @pkeys eltype(v) (:word, :numid)
+    @pkeys eltype(v) (:numid,)
+    TableReference(eltype(v))
+    db_type(eltype(v))
     try
         TableAlchemy.push_pkeys!(
             results,
