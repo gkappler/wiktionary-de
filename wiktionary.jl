@@ -144,7 +144,7 @@ output = expanduser("~/database/wiktionary-$datetimenow")
 mkpath(output)
 results = TypeDB(output)
 
-typed_data=collect_target_types(db_channel,10)
+typed_data=collect_target_types(db_channel,1000)
 
 for (target,v) in typed_data
     @db_name eltype(v) target
