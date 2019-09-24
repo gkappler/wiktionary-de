@@ -105,10 +105,6 @@ TableAlchemy.vector_index(x::Type{<:AbstractToken}) = :token
 
 db_name(Template{Token,LineContent})
 
-output = expanduser("~/database/wiktionary")
-mkpath(output)
-results = TypeDB(output)
-
 show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     r = "$w$m"
     if lastindex(r)>60        
@@ -142,21 +138,29 @@ using ResumableFunctions
     end
 end
 
-typed_data=collect_target_types(db_channel,cache_size)
+import Dates
+datetimenow = Dates.now()
+output = expanduser("~/database/wiktionary-$datetimenow")
+mkpath(output)
+results = TypeDB(output)
+
+typed_data=collect_target_types(db_channel,10)
 
 for (target,v) in typed_data
     @db_name eltype(v) target
     @db_autoindex eltype(v)
-    @pkeys eltype(v) (:numid,)
+    @pkeys eltype(v) (:word,)
     TableReference(eltype(v))
     db_type(eltype(v))
-    try
-        TableAlchemy.push_pkeys!(
+    # try
+        db, ks, jk = TableAlchemy.push_pkeys!(
             results,
-            TableAlchemy.joining_key_values(results, emptykeys(v), v));
-    catch e
-        @error "cannot push into db" exception=e
-    end
+            TableAlchemy.JoiningValues(results, emptykeys(v), v));
+    ## results[db,first(ks)...]
+    ## ks
+    # catch e
+    #     @error "cannot push into db" exception=e
+    # end
 end
 
 TableAlchemy.save(results)
