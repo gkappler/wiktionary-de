@@ -155,7 +155,8 @@ for (target,v) in typed_data
     # try
         db, ks, jk = TableAlchemy.push_pkeys!(
             results,
-            TableAlchemy.JoiningValues(results, emptykeys(v), v));
+            emptykeys(v), TypedIterator(v));
+    
     ## results[db,first(ks)...]
     ## ks
     # catch e
