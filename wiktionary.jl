@@ -34,6 +34,7 @@ prog = ProgressUnknown("Wiktionary indexing:")
 dprog = ProgressUnknown("data:")
 
 cache_size = 100
+min_mem = 3*10^9
 @everywhere sleep_time = .001
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
@@ -147,6 +148,12 @@ results = TypeDB(output)
 typed_data=collect_target_types(db_channel,1000)
 
 for (target,v) in typed_data
+    if Sys.free_memory() < min_mem
+        @info "memory pressure: saving data" (:mem_GB, Sys.free_memory()/10^9)
+        TableAlchemy.save(results)
+        Sys.GC.gc()
+        @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
+    end
     @db_name eltype(v) target
     @db_autoindex eltype(v)
     @pkeys eltype(v) (:word,)
