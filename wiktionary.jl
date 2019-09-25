@@ -172,8 +172,8 @@ mkpath(output)
 results = TypeDB(output)
 
 
-typevecs=TypePartitionChannel(db_channel,100)
-while isready(typevecs) || isopen(typevecs)
+typevecs=TypePartitionChannel(db_channel,10000)
+while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
     (into,dat) = take!(typevecs)
     global target,v = into,dat
     println()
