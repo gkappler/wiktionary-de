@@ -35,6 +35,7 @@ dprog = ProgressUnknown("data:")
 
 cache_size = 100
 min_mem = 3*10^9
+min_mem_juliadb = 10^9
 @everywhere sleep_time = .001
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
@@ -125,10 +126,12 @@ using ResumableFunctions
         let T=typeof(x) 
             v=get!(() -> TableAlchemy.VectorCache{T}(undef, size),
                    d,(target,T))
-            if isfull(v) || Sys.free_memory() < 1.5*min_mem ## tested on sercver
+            if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
                 r=collect(v)
                 ## create a new to release objects
-                d[(target,T)] = TableAlchemy.VectorCache{T}(undef, size)
+                v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, size)
+                @show n = sum([length(y) for y in values(d)])
+                ProgressMeter.next!(dprog; showvalues=[(:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
                 @yield (target,r)
             end
             push!(v,x)
@@ -150,10 +153,10 @@ results = TypeDB(output)
 typed_data=collect_target_types(db_channel,100)
 
 for (target,v) in typed_data
-    if Sys.free_memory() < min_mem
+    @info "indexing" eltype(v)
+    if Sys.free_memory() < min_mem_juliadb
         @info "memory pressure: saving data" (:mem_GB, Sys.free_memory()/10^9)
         TableAlchemy.save(results)
-        Sys.GC.gc()
         @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
     end
     @db_name eltype(v) target
@@ -165,6 +168,9 @@ for (target,v) in typed_data
         db, ks, jk = TableAlchemy.push_pkeys!(
             results,
             emptykeys(v), TypedIterator(v));
+
+    v = nothing
+    Sys.GC.gc()
     
     ## results[db,first(ks)...]
     ## ks
