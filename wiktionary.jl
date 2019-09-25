@@ -127,7 +127,8 @@ using ResumableFunctions
                    d,(target,T))
             if isfull(v) || Sys.free_memory() < 1.5*min_mem ## tested on sercver
                 r=collect(v)
-                empty!(v) ## n_,v_ = 1, Vector{T}(undef, cache_size)
+                ## create a new to release objects
+                d[(target,T)] = TableAlchemy.VectorCache{T}(undef, size)
                 @yield (target,r)
             end
             push!(v,x)
