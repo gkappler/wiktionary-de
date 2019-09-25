@@ -128,26 +128,31 @@ Base.isready(x::TypePartitionChannel) = isopen(x.incoming) ? isready(x.incoming)
 
 function Base.take!(c::TypePartitionChannel)
     s = x.size
-    while isready(c) || isopen(c)
-        (target,x) = take!(c.incoming)
-        ##@show x=take!(c)
-        T=NamedStruct{Symbol(target),typeof(x)}
-        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
-        v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
-               c.cache,(target,T))
-        if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
-            r=collect(v)
-            ## create a new to release objects
-            v=c.cache[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
-            vector_cache_size = sum([length(y) for y in values(c.cache)])
-            @info "processing" vector_cache_size Sys.free_memory()/10^9
-            return (target,r)
+    while isopen(c)
+        while isready(c)
+            (target,x) = take!(c.incoming)
+            ##@show x=take!(c)
+            T=NamedStruct{Symbol(target),typeof(x)}
+            ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
+            v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
+                   c.cache,(target,T))
+            if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
+                r=collect(v)
+                ## create a new to release objects
+                v=c.cache[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
+                ## empty!(v) ## n_,v_ = 1, Vector{T}(undef, cache_size)
+                vector_cache_size = sum([length(y) for y in values(c.cache)])
+                @info "processing" vector_cache_size Sys.free_memory()/10^9
+                return (target,r)
+            end
+            push!(v,T(x))
         end
-        push!(v,T(x))
+        sleep(0.01)
     end
     collect(first(values(x.cache)))
 end
 
+## target,v = typed_data()
 
 import Dates
 datetimenow = Dates.now()
