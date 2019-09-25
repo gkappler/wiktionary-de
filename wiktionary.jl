@@ -114,17 +114,18 @@ show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
         r
     end
 end
+
 using ResumableFunctions
 @resumable function collect_target_types(c, size=2)
     d = Dict{Tuple{String,Type},TableAlchemy.VectorCache}()
     while isready(c) || isopen(c)
         (target,x) = take!(c)
-        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem, Sys.free_memory()/10^6) ])
+        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
         ##@show x=take!(c)
         let T=typeof(x) 
             v=get!(() -> TableAlchemy.VectorCache{T}(undef, size),
                    d,(target,T))
-            if isfull(v)
+            if isfull(v) || Sys.free_memory() < 1.5*min_mem ## tested on sercver
                 r=collect(v)
                 empty!(v) ## n_,v_ = 1, Vector{T}(undef, cache_size)
                 @yield (target,r)
@@ -145,7 +146,7 @@ output = expanduser("~/database/wiktionary-$datetimenow")
 mkpath(output)
 results = TypeDB(output)
 
-typed_data=collect_target_types(db_channel,1000)
+typed_data=collect_target_types(db_channel,100)
 
 for (target,v) in typed_data
     if Sys.free_memory() < min_mem
