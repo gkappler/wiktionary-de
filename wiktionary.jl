@@ -127,7 +127,7 @@ Base.isopen(x::TypePartitionChannel) = !isempty(x.cache) || isready(x.incoming)
 Base.isready(x::TypePartitionChannel) = isopen(x.incoming) ? isready(x.incoming) : !isempty(x.cache)
 
 function Base.take!(c::TypePartitionChannel)
-    s = x.size
+    s = c.length
     while isopen(c)
         while isready(c)
             (target,x) = take!(c.incoming)
@@ -136,7 +136,7 @@ function Base.take!(c::TypePartitionChannel)
             ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
             v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
                    c.cache,(target,T))
-            if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
+            if isfull(v) ## || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
                 r=collect(v)
                 ## create a new to release objects
                 v=c.cache[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
