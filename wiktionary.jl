@@ -129,8 +129,8 @@ using ResumableFunctions
             r=collect(v)
             ## create a new to release objects
             v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
-            n = sum([length(y) for y in values(d)])
-            ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
+            vector_cache_size = sum([length(y) for y in values(d)])
+            @info "processing" vector_cache_size Sys.free_memory()/10^9
             @yield (target,r)
         end
             push!(v,T(x))
