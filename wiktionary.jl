@@ -116,35 +116,42 @@ show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     end
 end
 
-using ResumableFunctions
-@resumable function collect_target_types(c, s=2)
-    d = Dict{Tuple{String,Type},TableAlchemy.VectorCache}()
+struct TypePartitionChannel{I}
+    cache::Dict{Tuple{String,Type},TableAlchemy.VectorCache}
+    incoming::I
+    length::Int
+end
+TypePartitionChannel(i::I, l=100) where I = TypePartitionChannel{I}(
+    Dict{Tuple{String,Type},TableAlchemy.VectorCache}(),i, l)
+Base.isopen(x::TypePartitionChannel) = !isempty(x.cache) || isready(x.incoming)
+Base.isready(x::TypePartitionChannel) = isopen(x.incoming) ? isready(x.incoming) : !isempty(x.cache)
+
+function Base.take!(c::TypePartitionChannel)
+    s = x.size
     while isready(c) || isopen(c)
-        (target,x) = take!(c)        
+        (target,x) = take!(c.incoming)
         ##@show x=take!(c)
         T=NamedStruct{Symbol(target),typeof(x)}
+        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
         v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
-                   d,(target,T))
+               c.cache,(target,T))
         if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
             r=collect(v)
             ## create a new to release objects
-            v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
-            vector_cache_size = sum([length(y) for y in values(d)])
+            v=c.cache[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
+            vector_cache_size = sum([length(y) for y in values(c.cache)])
             @info "processing" vector_cache_size Sys.free_memory()/10^9
-            @yield (target,r)
+            return (target,r)
         end
-            push!(v,T(x))
+        push!(v,T(x))
     end
-    for (k,v) = pairs(d)
-        if length(v)>1
-            @yield (k[1],collect(v))
-        end
-    end
+    collect(first(values(x.cache)))
 end
-typed_data=collect_target_types(db_channel,1000)
+
 
 import Dates
 datetimenow = Dates.now()
+
 @db_autoindex NamedStruct{:meaning}
 @db_autoindex NamedStruct{:word}
 JT = joined_pkeys_tuple(Token)
@@ -160,7 +167,9 @@ mkpath(output)
 results = TypeDB(output)
 
 
-for (into,dat) in typed_data
+typevecs=TypePartitionChannel(db_channel,100)
+while isready(typevecs) || isopen(typevecs)
+    (into,dat) = take!(typevecs)
     global target,v = into,dat
     println()
     @info "indexing $(length(v)) $(eltype(v))"
