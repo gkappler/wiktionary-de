@@ -151,7 +151,7 @@ JT = joined_pkeys_tuple(Token)
 @pkeys NamedStruct{:meaning} NamedTuple{tuple(:word),Tuple{JT}}
 @pkeys NamedStruct{:word} NamedTuple{tuple(:word),Tuple{JT}}
 
-dryrun = true
+dryrun = false
 pkeys_tuple(NamedStruct{:word})
 pkeys_tuple(NamedStruct{:word, NamedTuple{tuple(:word),Tuple{Token}}})
 
