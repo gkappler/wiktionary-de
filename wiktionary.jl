@@ -117,25 +117,24 @@ show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
 end
 
 using ResumableFunctions
-@resumable function collect_target_types(c, size=2)
+@resumable function collect_target_types(c, s=2)
     d = Dict{Tuple{String,Type},TableAlchemy.VectorCache}()
     while isready(c) || isopen(c)
-        (target,x) = take!(c)
-        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
+        (target,x) = take!(c)        
         ##@show x=take!(c)
-        let T=typeof(x) 
-            v=get!(() -> TableAlchemy.VectorCache{T}(undef, size),
+        T=NamedStruct{Symbol(target),typeof(x)}
+        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
+        v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
                    d,(target,T))
-            if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
-                r=collect(v)
-                ## create a new to release objects
-                v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, size)
-                @show n = sum([length(y) for y in values(d)])
-                ProgressMeter.next!(dprog; showvalues=[(:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
-                @yield (target,r)
-            end
-            push!(v,x)
+        if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
+            r=collect(v)
+            ## create a new to release objects
+            v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
+            n = sum([length(y) for y in values(d)])
+            ProgressMeter.next!(dprog; showvalues=[(:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
+            @yield (target,r)
         end
+            push!(v,T(x))
     end
     for (k,v) = pairs(d)
         if length(v)>1
@@ -143,32 +142,42 @@ using ResumableFunctions
         end
     end
 end
+typed_data=collect_target_types(db_channel,10)
 
 import Dates
 datetimenow = Dates.now()
+@db_autoindex NamedStruct{:meaning}
+@db_autoindex NamedStruct{:word}
+JT = joined_pkeys_tuple(Token)
+@pkeys NamedStruct{:meaning} NamedTuple{tuple(:word),Tuple{JT}}
+@pkeys NamedStruct{:word} NamedTuple{tuple(:word),Tuple{JT}}
+
+dryrun = true
+pkeys_tuple(NamedStruct{:word})
+pkeys_tuple(NamedStruct{:word, NamedTuple{tuple(:word),Tuple{Token}}})
+
 output = expanduser("~/database/wiktionary-$datetimenow")
 mkpath(output)
 results = TypeDB(output)
 
-typed_data=collect_target_types(db_channel,100)
 
 for (target,v) in typed_data
-    @info "indexing" eltype(v)
+    println()
+    @info "indexing $(length(v)) $(eltype(v))"
     if Sys.free_memory() < min_mem_juliadb
         @info "memory pressure: saving data" (:mem_GB, Sys.free_memory()/10^9)
         TableAlchemy.save(results)
         @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
     end
-    @db_name eltype(v) target
-    @db_autoindex eltype(v)
-    @pkeys eltype(v) (:word,)
     TableReference(eltype(v))
+    db_name(eltype(v))
     db_type(eltype(v))
     # try
+    if !dryrun
         db, ks, jk = TableAlchemy.push_pkeys!(
             results,
             emptykeys(v), TypedIterator(v));
-
+    end
     v = nothing
     Sys.GC.gc()
     
