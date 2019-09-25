@@ -123,7 +123,6 @@ using ResumableFunctions
         (target,x) = take!(c)        
         ##@show x=take!(c)
         T=NamedStruct{Symbol(target),typeof(x)}
-        ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
         v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
                    d,(target,T))
         if isfull(v) || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
@@ -131,7 +130,7 @@ using ResumableFunctions
             ## create a new to release objects
             v=d[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
             n = sum([length(y) for y in values(d)])
-            ProgressMeter.next!(dprog; showvalues=[(:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
+            ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:vectorcaches, n), (:mem_GB, Sys.free_memory()/10^9) ])
             @yield (target,r)
         end
             push!(v,T(x))
@@ -142,7 +141,7 @@ using ResumableFunctions
         end
     end
 end
-typed_data=collect_target_types(db_channel,10)
+typed_data=collect_target_types(db_channel,1000)
 
 import Dates
 datetimenow = Dates.now()
@@ -161,9 +160,11 @@ mkpath(output)
 results = TypeDB(output)
 
 
-for (target,v) in typed_data
+for (into,dat) in typed_data
+    global target,v = into,dat
     println()
     @info "indexing $(length(v)) $(eltype(v))"
+    println()
     if Sys.free_memory() < min_mem_juliadb
         @info "memory pressure: saving data" (:mem_GB, Sys.free_memory()/10^9)
         TableAlchemy.save(results)
