@@ -149,13 +149,14 @@ function Base.take!(c::TypePartitionChannel)
         end
         sleep(0.01)
     end
-    collect(first(values(x.cache)))
+    target,x = pop!(c.cache)
+    (target, collect(x) )
 end
 
 ## target,v = typed_data()
 
 import Dates
-datetimenow = Dates.now()
+datetimenow = Dates.format(Dates.now(),"Y-mm-dd HHhMM")
 
 @db_autoindex NamedStruct{:meaning}
 @db_autoindex NamedStruct{:word}
