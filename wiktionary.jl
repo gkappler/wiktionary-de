@@ -104,7 +104,7 @@ end
 wc=mc=0
 @everywhere function process_xml(inbox, db_channel; progress=nothing)
     try
-        parse_bz2() do val, counter
+        parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
             progress !== nothing && ProgressMeter.next!(
                 progress; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
             put!(inbox, val)
