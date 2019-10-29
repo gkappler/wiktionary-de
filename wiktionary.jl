@@ -123,9 +123,9 @@ end
 
 #parse_task = @async
 xml_worker, page_workers = if workers()!=[1]
-    workers()[1], WorkerPool(workers()[2:end])
+    workers()[1], workers()[2:end]
 else
-    1, WorkerPool(workers())
+    1, workers()
 end
 
 @async xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
