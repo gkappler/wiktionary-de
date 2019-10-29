@@ -7,10 +7,11 @@ cd(expanduser("~/dev/julia/"))
 using Pkg
 Pkg.activate("wiktionary")
 using Distributed
-## addprocs(1)
-@info "using $(nprocs()) prcs $(nworkers()) workers"
 
-@everywhere    using Pkg
+#addprocs(1)
+@info "using $(nprocs()) prcs $(nworkers()) workers"
+# using Revise
+@everywhere  using Pkg
 @everywhere    Pkg.activate("wiktionary")
 @everywhere    Pkg.resolve()
 @everywhere    Pkg.instantiate()
@@ -18,6 +19,7 @@ using Distributed
     println("loading TableAlchemy")
     cd(expanduser("~/dev/julia/"))
     using TableAlchemy
+    using ParserAlchemy
     println("worker ready")
 end
 
@@ -47,18 +49,49 @@ end
     println("loading FilingForest")
     cd(expanduser("~/dev/julia/"))
     using FilingForest
-    using FilingForest.Parser
-    using FilingForest.OrgParser
-    using FilingForest.Tokens
-    using FilingForest.WikiParser
-    function nextchunk(inbox, db_channel)
-        while isopen(inbox)
+    using ParserAlchemy
+    using OrgParser
+    using ParserAlchemy.Tokens
+    using WikitextParser
+    import ProgressMeter
+    import ProgressMeter: next!
+    import WikitextParser: wikitext
+    function wikichunks(inbox, output;
+                        wikitextParser = wikitext(namespace = "wikt:de"),
+                        prog=nothing, wait_onwarn = false, log = false, errorfile=nothing)
+        val = take!(inbox);
+        prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
+        ntext = try
+            r=tokenize(wikitextParser, val.revision.text; errorfile=errorfile)
+            r === nothing ? nothing : tokenize(wiktionary_defs,r, delta=3)
+        catch e
+            if wait_onwarn ##&& i < lastindex(val.revision.text)
+                print("inspect and press <ENTER>")
+                readline()
+            end
+            rethrow(e)
+        end        
+        if ntext !== nothing
+            for v in ntext
+                for (w, ms) = wiki_meaning(v)
+                    put!(output,("word", w))
+                    for m in ms
+                        put!(output, ("meaning", m))
+                    end
+                end
+            end
+        end
+    end
+    function process_wikitext(inbox, db_channel)
+        while isopen(inbox) || isready(inbox)
             try
                 @info "compiling" maxlog=1
-                wikichunks(inbox, db_channel; errorfile=errorfile)
+                wikichunks(inbox, db_channel; errorfile=errorfile, prog=dprog)
                 @info "compiling done" maxlog=1
             catch e
+                sleep(1)
                 @warn "cannot parse meanings in wiktionary" exception=e
+                ## rethrow(e)
             end
             sleep(sleep_time)
         end
@@ -69,13 +102,14 @@ end
 @info "start loading"
 
 wc=mc=0
-read_task = @async begin
+@everywhere function process_xml(inbox, db_channel; progress=nothing)
     try
-    parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
-        ## ProgressMeter.next!(prog; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
-        put!(inbox, val)
-        sleep(sleep_time)
-    end
+        parse_bz2() do val, counter
+            progress !== nothing && ProgressMeter.next!(
+                progress; showvalues=[(:word, val.title), (:mem, Sys.free_memory()/10^6) ])
+            put!(inbox, val)
+            sleep(sleep_time)
+        end
     catch e
         @error "xml parsing" exception=e
     end
@@ -88,25 +122,22 @@ end
 ## bind(inbox, read_task) ## close inbox when reading is done
 
 #parse_task = @async
-## nextchunk(inbox, db_channel)
-for p in workers()## [1:end-1]
-    remote_do(nextchunk, p, inbox, db_channel)
+xml_worker, page_workers = if workers()!=[1]
+    workers()[1], WorkerPool(workers()[2:end])
+else
+    1, WorkerPool(workers())
 end
 
-@db_name TokenString "TokenString"
-@db_name AbstractToken "AbstractToken"
-@db_name LineContent "LineContent"
-@db_name Token "Token"
-@db_name Template{Token,LineContent} "Template"
-@db_internjoin Template{Token,LineContent} false
-@db_internjoin LineContent false
-@db_internjoin Token true
-TableAlchemy.vector_index(x::Type{<:Line}) = :line
-TableAlchemy.vector_index(x::Type{<:Paragraph}) = :par
-TableAlchemy.vector_index(x::Type{<:AbstractToken}) = :token
+@async xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
 
-db_name(Template{Token,LineContent})
 
+for p in page_workers## [1:end-1]
+    remotecall(process_wikitext, p, inbox, db_channel)
+end
+
+
+
+typevecs=TypePartitionChannel(db_channel,1000)
 show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     r = "$w$m"
     if lastindex(r)>60        
@@ -114,66 +145,36 @@ show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     else
         r
     end
+    ProgressMeter.next!(dprog; showvalues=[(:entry, r), (:mem_GB, Sys.free_memory()/10^9) ])
 end
-
-struct TypePartitionChannel{I}
-    cache::Dict{Tuple{String,Type},TableAlchemy.VectorCache}
-    incoming::I
-    length::Int
-end
-TypePartitionChannel(i::I, l=100) where I = TypePartitionChannel{I}(
-    Dict{Tuple{String,Type},TableAlchemy.VectorCache}(),i, l)
-Base.isopen(x::TypePartitionChannel) = !isempty(x.cache) || isready(x.incoming)
-Base.isready(x::TypePartitionChannel) = isopen(x.incoming) ? isready(x.incoming) : !isempty(x.cache)
-
-function Base.take!(c::TypePartitionChannel)
-    s = c.length
-    while isopen(c)
-        while isready(c)
-            (target,x) = take!(c.incoming)
-            ##@show x=take!(c)
-            T=NamedStruct{Symbol(target),typeof(x)}
-            ProgressMeter.next!(dprog; showvalues=[(:entry, show_wiki(x)), (:mem_GB, Sys.free_memory()/10^9) ])
-            v=get!(() -> TableAlchemy.VectorCache{T}(undef, s),
-                   c.cache,(target,T))
-            if isfull(v) ## || (Sys.free_memory() < 1.5*min_mem) ## tested on sercver
-                r=collect(v)
-                ## create a new to release objects
-                v=c.cache[(target,T)] = TableAlchemy.VectorCache{T}(undef, s)
-                ## empty!(v) ## n_,v_ = 1, Vector{T}(undef, cache_size)
-                vector_cache_size = sum([length(y) for y in values(c.cache)])
-                @info "processing" vector_cache_size Sys.free_memory()/10^9
-                return (target,r)
-            end
-            push!(v,T(x))
-        end
-        sleep(0.01)
-    end
-    target,x = pop!(c.cache)
-    (target, collect(x) )
-end
-
-## target,v = typed_data()
 
 import Dates
-datetimenow = Dates.format(Dates.now(),"Y-mm-dd HHhMM")
-
-@db_autoindex NamedStruct{:meaning}
-@db_autoindex NamedStruct{:word}
-JT = joined_pkeys_tuple(Token)
-@pkeys NamedStruct{:meaning} NamedTuple{tuple(:word),Tuple{JT}}
-@pkeys NamedStruct{:word} NamedTuple{tuple(:word),Tuple{JT}}
-
-dryrun = false
-pkeys_tuple(NamedStruct{:word})
-pkeys_tuple(NamedStruct{:word, NamedTuple{tuple(:word),Tuple{Token}}})
-
+datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
 output = expanduser("~/database/wiktionary-$datetimenow")
 mkpath(output)
 results = TypeDB(output)
 
+begin ## setup
+    using ParserAlchemy.Tokens
+    
+    clearnames!(results)
+    db_name!(results, Token, :Token)
+    db_intern!(results, Token)
+    db_name!(results, TokenPair{Symbol,Vector{LineContent}}, :TokenPair)
+    db_name!(results, Template{Token,LineContent}, :Template)
+    db_name!(results, Pair{String,Paragraph}, :TemplateArgument)
+    db_name!(results, Line{Token,LineContent}, :Line)
+    db_name!(results, Paragraph{Token,LineContent}, :Paragraph)
+    db_name!(results, Pair{String,Vector{Line{Token,LineContent}}},
+             Symbol("Pair{String,Paragraph}"))
+    vector_index!(results, Vector{Token}, :token)
+    vector_index!(results, Vector{LineContent}, :token)
+    vector_index!(results, Paragraph{Token,LineContent}, :line)
+    results.type_dict
+end
 
-typevecs=TypePartitionChannel(db_channel,10000)
+dryrun = false
+
 while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
     (into,dat) = take!(typevecs)
     global target,v = into,dat
@@ -185,10 +186,10 @@ while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_chann
         TableAlchemy.save(results)
         @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
     end
-    TableReference(eltype(v))
-    db_name(eltype(v))
-    db_type(eltype(v))
+
+    db_name!(results, eltype(v), target)
     # try
+    pkeys_tuple!(results, eltype(v), :word, :numid)
     if !dryrun
         db, ks, jk = TableAlchemy.push_pkeys!(
             results,
