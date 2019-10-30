@@ -137,7 +137,7 @@ end
 
 
 
-typevecs=TypePartitionChannel(db_channel,1000)
+typevecs=TypePartitionChannel(db_channel,10000)
 show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
     r = "$w$m"
     if lastindex(r)>60        
