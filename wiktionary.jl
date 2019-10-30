@@ -86,7 +86,7 @@ end
         while isopen(inbox) || isready(inbox)
             try
                 @info "compiling" maxlog=1
-                wikichunks(inbox, db_channel; errorfile=errorfile, prog=dprog)
+                wikichunks(inbox, db_channel; errorfile=errorfile)
                 @info "compiling done" maxlog=1
             catch e
                 sleep(1)
