@@ -38,14 +38,14 @@ results.type_names
 ## take!(db_channel)
 ## take!(inbox)
 import ParserAlchemy.Tokens: token_lines
-token_lines(x::NamedTuple{ns,ts}) where {ns,ts} =
-    (; ( ( n => token_lines(getproperty(x,n); typenames=results.type_names))
+token_lines(x::NamedTuple{ns,ts}; typenames=results.type_names) where {ns,ts} =
+    (; ( ( n => token_lines(getproperty(x,n); typenames=typenames))
          for (n,t) in zip(ns, fieldtypes(ts)) )...
      )
-token_lines(x::NamedStruct{name}) where {name} =
-    NamedStruct{name}(token_lines(get(x)))
+token_lines(x::NamedStruct{name}; typenames=results.type_names) where {name} =
+    NamedStruct{name}(token_lines(get(x); typenames=typenames))
 
-token_lines(x) = x
+token_lines(x; kw...) = x
 
 rich_lines(x::NamedTuple{ns,ts};typenames=Main.results.type_names, kw...)  where {ns,ts} =
     (; ( ( n => rich_lines(getproperty(x,n); typenames=typenames, kw...))
