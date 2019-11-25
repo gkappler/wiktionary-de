@@ -43,7 +43,8 @@ min_mem_juliadb = 10^9
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
 
-@everywhere errorfile = joinpath(expanduser("~"),"ParserAlchemy.err")
+
+@everywhere errorfile = joinpath(expanduser("~"),"ParserAlchemy.err.org")
 open(errorfile,"w") do io
 end
 @everywhere begin
