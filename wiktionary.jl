@@ -150,48 +150,16 @@ show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
 end
 
 
-TableAlchemy._db_name(::Type{<:NamedString}) = "Indent"
-
 import Dates
 datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
 output = expanduser("~/database/wiktionary-$datetimenow")
 mkpath(output)
 results = TypeDB(output)
 
-begin ## setup
-    using ParserAlchemy.Tokens
-    
-    clearnames!(results)
-    db_name!(results, Token, :Token)
-    db_intern!(results, Token)
-    db_name!(results, LinePrefix{NamedString}, :Prefix)
-    db_intern!(results, LinePrefix{NamedString})
-    db_name!(results, Line{NamedString,Token}, :Line)
-    db_name!(results, Node{Line{Token,AbstractToken}}, :Node)
-    db_name!(results, WikiLink, :WikiLink)
-    db_name!(results, String, :String)
-    db_name!(results, Symbol, :Symbol)
-    db_name!(results, TokenPair{Symbol,Vector{LineContent}}, :TokenPair)
-    db_name!(results, Template{Token,LineContent}, :Template)
-    db_name!(results, Pair{String,Paragraph}, :TemplateArgument)
-    db_name!(results, Paragraph{Token,LineContent}, :Paragraph)
-    db_name!(results, Pair{String,Vector{Line{Token,LineContent}}},
-             Symbol("Pair{String,Paragraph}"))
-    vector_index!(results, Vector{Token}, :token)
-    vector_index!(results, Vector{LineContent}, :token)
-    vector_index!(results, Paragraph{NamedString,Token}, :line)
-    results.type_names
-end
 
 dryrun = false
+include("tablesetup.jl")
 
-import ParserAlchemy.Tokens: token_lines
-token_lines(x::NamedTuple{ns,ts}) where {ns,ts} =
-    (; ( ( n => (t <: Vector{<:Line} ? token_lines(getproperty(x,n); typenames=results.type_names) : getproperty(x,n)))
-         for (n,t) in zip(ns, fieldtypes(ts)) )...
-     )
-token_lines(x::NamedStruct{name}) where {name} =
-    NamedStruct{name}(token_lines(get(x)))
 
 while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
     global target,v_ = take!(typevecs);
