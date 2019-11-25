@@ -64,9 +64,9 @@ rich_lines(x::TableAlchemy.IndexedVector{name}; typenames=Main.results.type_name
 
 
 
-M=TableAlchemy.result_type(results,:meaning)
+M=NamedStruct{:meaning}
 
-W=TableAlchemy.result_type(results,:word)
+W=NamedStruct{::word}
 
 function Base.show(io::IO, x::Vector{<:Union{M,W}})
     for p in x
