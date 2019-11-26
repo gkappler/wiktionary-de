@@ -61,28 +61,37 @@ end
     function wikichunks(inbox, output;
                         wikitextParser = wikitext(namespace = "wikt:de"),
                         prog=nothing, wait_onwarn = false, log = false, errorfile=nothing)
-        val = take!(inbox);
+        val = take!(inbox)
         prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
-        ntext = try
+        try
+            ##print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
             r=tokenize(wikitextParser, val.revision.text; errorfile=errorfile)
-            r === nothing ? nothing : tokenize(wiktionary_defs,r, delta=3)
+            ntext = r === nothing ? nothing : tokenize(wiktionary_defs,r, delta=3)
+            if ntext !== nothing
+                for v in ntext
+                    for (w, ms) = wiki_meaning(v)
+                        put!(output,("word", w))
+                        for m in ms
+                            put!(output, ("meaning", m))
+                        end
+                    end
+                end
+            end
         catch e
             if wait_onwarn ##&& i < lastindex(val.revision.text)
                 print("inspect and press <ENTER>")
                 readline()
-            end
-            rethrow(e)
-        end        
-        if ntext !== nothing
-            for v in ntext
-                for (w, ms) = wiki_meaning(v)
-                    put!(output,("word", w))
-                    for m in ms
-                        put!(output, ("meaning", m))
-                    end
+            else
+                make_org(s) = replace(s, r"^\*"m => " *")
+                open(errorfile, "a") do io
+                    println(io, "* wikichunk error in $(val.title)!")
+                    println(io, e)
+                    println(io, "** data")
+                    println(io, make_org(val.revision.text))
                 end
             end
-        end
+            ## rethrow(e)
+        end        
     end
     function process_wikitext(inbox, db_channel)
         while isopen(inbox) || isready(inbox)
@@ -165,7 +174,7 @@ include("tablesetup.jl")
 while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
     global target,v_ = take!(typevecs; log=show_wiki);
     global v = token_lines.(v_);
-    @info "indexing $(length(v)) $(eltype(v))"
+    @info "indexing $(length(v)) $(target)"
     if Sys.free_memory() < min_mem_juliadb
         @info "saving data, free memory" (:mem_GB, Sys.free_memory()/10^9)
         TableAlchemy.save(results)
