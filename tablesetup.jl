@@ -13,7 +13,7 @@ db_name!(results, LinePrefix{NamedString}, :Prefix)
 db_intern!(results, LinePrefix{NamedString})
 ## db_intern!(results, (:type => :Line , :field => :prefix), Vector{NamedString})
 ## db_name!(results, Vector{NamedString}, :Prefix)
-db_name!(results, Line{NamedString,Token}, :Line)
+db_name!(results, Line{NamedString,AbstractToken}, :Line)
 db_name!(results, Node{Line{NamedString,AbstractToken}}, :Node)
 db_name!(results, WikiLink, :WikiLink)
 db_name!(results, String, :String)
@@ -76,7 +76,8 @@ end
 
 function Base.show(io::IO, x::M)
     global results
-    println(io, x.word, " ", x.order, " (", x.numid, ")")
+    print(io, x.word, " ", x.order)
+    hasfield(typeof(x),:numid) ? println(io, " (", x.numid, ")") : println(io)
     for p in propertynames(x)
         if !in(p, [ :word, :order, :numid ])
             v = getproperty(x,p)
@@ -90,7 +91,8 @@ end
 
 function Base.show(io::IO, x::W)
     global results
-    println(io, x.word, " ", " (", x.numid, ")")
+    println(io, x.word)
+    hasfield(typeof(x),:numid) ? println(io, " (", x.numid, ")") : println(io)
     for p in propertynames(x)
         if !in(p, [ :word, :numid ])
             v = getproperty(x,p)

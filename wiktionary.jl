@@ -163,13 +163,11 @@ include("tablesetup.jl")
 
 
 while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
-    global target,v_ = take!(typevecs);
+    global target,v_ = take!(typevecs; log=show_wiki);
     global v = token_lines.(v_);
-    println()
     @info "indexing $(length(v)) $(eltype(v))"
-    println()
     if Sys.free_memory() < min_mem_juliadb
-        @info "memory pressure: saving data" (:mem_GB, Sys.free_memory()/10^9)
+        @info "saving data, free memory" (:mem_GB, Sys.free_memory()/10^9)
         TableAlchemy.save(results)
         @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
     end
