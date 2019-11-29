@@ -60,6 +60,7 @@ end
     import WikitextParser: wikitext
     function process_entry(wikitextParser, inbox, db_channel;
                            prog=nothing, log = false)
+        make_org(s) = replace(s, r"^\*"m => " *")
         val = take!(inbox)
         try
             prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
@@ -77,11 +78,20 @@ end
                     end
                 end
             catch e
-                @warn "save as page $(val.title) $e" ##exception = e #(e,catch_backtrace())
-                ## put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
+                @warn "save as page $(val.title)" ##exception = e #(e,catch_backtrace())
+                open(errorfile, "a") do io
+                    println(io, "* PAGE $(val.title)!")
+                    println(io, "#+begin_src wikitext\n")
+                    println(io, make_org(val.revision.text))
+                    println(io, "\n#+end_src")
+                    println(io, "** stacktrace")
+                    println(io, "#+begin_src julia\n")
+                    Base.showerror(io, e)
+                    println(io, "\n#+end_src")
+                end
+                put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
             end
         catch e
-            make_org(s) = replace(s, r"^\*"m => " *")
             open(errorfile, "a") do io
                 println(io, "* wikichunk error in $(val.title)!")
                 println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
@@ -94,7 +104,9 @@ end
                 println(io, make_org(val.revision.text))
                 println(io, "\n#+end_src")
                 println(io, "** stacktrace")
-                println(io, stacktrace(catch_backtrace()))
+                println(io, "** subdata\n#+begin_src julia\n")
+                Base.showerror(io, e)
+                println(io, "\n#+end_src")
             end
             @warn "error" e
         end
