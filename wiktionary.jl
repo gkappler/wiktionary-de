@@ -58,52 +58,52 @@ end
     import ProgressMeter
     import ProgressMeter: next!
     import WikitextParser: wikitext
-    function wikichunks(inbox, output;
-                        wikitextParser = wikitext(namespace = "wikt:de"),
-                        prog=nothing, wait_onwarn = false, log = false, errorfile=nothing)
+    function process_entry(wikitextParser, inbox, db_channel;
+                           prog=nothing, log = false)
         val = take!(inbox)
-        prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
         try
-            ##print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
-            r=tokenize(wikitextParser, val.revision.text; errorfile=errorfile)
-            ntext = r === nothing ? nothing : tokenize(wiktionary_defs,r, delta=3)
-            if ntext !== nothing
+            prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
+            ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
+            r=tokenize(wikitextParser, val.revision.text; partial=:error)
+            ## r=tokenize(wikitextParser, t; errorfile=errorfile)
+            try
+                ntext = tokenize(wiktionary_defs,r)
                 for v in ntext
                     for (w, ms) = wiki_meaning(v)
-                        put!(output,("word", w))
+                        put!(db_channel,("word", w))
                         for m in ms
-                            put!(output, ("meaning", m))
+                            put!(db_channel, ("meaning", m))
                         end
                     end
                 end
+            catch e
+                @warn "save as page $(val.title) $e" ##exception = e #(e,catch_backtrace())
+                ## put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
             end
         catch e
-            if wait_onwarn ##&& i < lastindex(val.revision.text)
-                print("inspect and press <ENTER>")
-                readline()
-            else
-                make_org(s) = replace(s, r"^\*"m => " *")
-                open(errorfile, "a") do io
-                    println(io, "* wikichunk error in $(val.title)!")
-                    println(io, e)
-                    println(io, "** data")
-                    println(io, make_org(val.revision.text))
+            make_org(s) = replace(s, r"^\*"m => " *")
+            open(errorfile, "a") do io
+                println(io, "* wikichunk error in $(val.title)!")
+                println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
+                if e.str==val.revision.text
+                    println(io, "** subdata\n#+begin_src wikitext\n")
+                    println(io, make_org(e.str))
+                    println(io, "\n#+end_src")
                 end
+                println(io, "** data\n#+begin_src wikitext\n")
+                println(io, make_org(val.revision.text))
+                println(io, "\n#+end_src")
+                println(io, "** stacktrace")
+                println(io, stacktrace(catch_backtrace()))
             end
-            ## rethrow(e)
-        end        
+            @warn "error" e
+        end
     end
-    function process_wikitext(inbox, db_channel)
+    function process_wikitext(wt,inbox, db_channel)
         while isopen(inbox) || isready(inbox)
-            try
-                @info "compiling" maxlog=1
-                wikichunks(inbox, db_channel; errorfile=errorfile)
-                @info "compiling done" maxlog=1
-            catch e
-                sleep(1)
-                @warn "cannot parse meanings in wiktionary" exception=e
-                ## rethrow(e)
-            end
+            @info "compiling" maxlog=1
+            process_entry(wt,inbox, db_channel)
+            @info "compiling done" maxlog=1
             sleep(sleep_time)
         end
     end
@@ -142,8 +142,10 @@ end
 @async xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
 
 
+wt=wikitext(namespace = "wikt:de");
+
 for p in page_workers## [1:end-1]
-    remotecall(process_wikitext, p, inbox, db_channel)
+    remotecall(process_wikitext, p, wt, inbox, db_channel)
 end
 
 
