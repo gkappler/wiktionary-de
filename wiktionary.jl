@@ -68,14 +68,18 @@ end
             r=tokenize(wikitextParser, val.revision.text; partial=:error)
             ## r=tokenize(wikitextParser, t; errorfile=errorfile)
             try
-                ntext = tokenize(wiktionary_defs,r)
-                for v in ntext
-                    for (w, ms) = wiki_meaning(v)
-                        put!(db_channel,("word", w))
-                        for m in ms
-                            put!(db_channel, ("meaning", m))
+                if match(r"^(?:Hilfe|Kategorie)","Hilfe") === nothing
+                    ntext = tokenize(wiktionary_defs,r)
+                    for v in ntext
+                        for (w, ms) = wiki_meaning(v)
+                            put!(db_channel,("word", w))
+                            for m in ms
+                                put!(db_channel, ("meaning", m))
+                            end
                         end
                     end
+                else
+                    put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
                 end
             catch e
                 @warn "save as page $(val.title)" ##exception = e #(e,catch_backtrace())
