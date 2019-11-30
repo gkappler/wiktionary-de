@@ -68,7 +68,7 @@ end
             r=tokenize(wikitextParser, val.revision.text; partial=:error)
             ## r=tokenize(wikitextParser, t; errorfile=errorfile)
             try
-                if match(r"^(?:Hilfe|Kategorie)","Hilfe") === nothing
+                if match(r"^(?:Hilfe|Kategorie)",val.title) === nothing
                     ntext = tokenize(wiktionary_defs,r)
                     for v in ntext
                         for (w, ms) = wiki_meaning(v)
