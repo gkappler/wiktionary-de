@@ -67,7 +67,7 @@ end
             ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
             r=tokenize(wt, val.revision.text; partial=:error);
             try
-                if match(r"^(?:Hilfe|Kategorie)",val.title) === nothing
+                if match(r"^(?:Vorlage|Hilfe|Kategorie)",val.title) === nothing
                     ntext = tokenize(wiktionary_defs,r)
                     for v in ntext
                         for (w, ms) = wiki_meaning(v)
