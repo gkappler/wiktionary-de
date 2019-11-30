@@ -58,28 +58,27 @@ end
     import ProgressMeter
     import ProgressMeter: next!
     import WikitextParser: wikitext
-    function process_entry(wikitextParser, inbox, db_channel;
+    function process_entry(wt, inbox, db_channel;
                            prog=nothing, log = false)
         make_org(s) = replace(s, r"^\*"m => " *")
         val = take!(inbox)
         try
             prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
             ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
-            r=tokenize(wikitextParser, val.revision.text; partial=:error)
-            ## r=tokenize(wikitextParser, t; errorfile=errorfile)
+            r=tokenize(wt, val.revision.text; partial=:error);
             try
                 if match(r"^(?:Hilfe|Kategorie)",val.title) === nothing
                     ntext = tokenize(wiktionary_defs,r)
                     for v in ntext
                         for (w, ms) = wiki_meaning(v)
-                            put!(db_channel,("word", w))
+                            put!(db_channel, ("word", w))
                             for m in ms
                                 put!(db_channel, ("meaning", m))
                             end
                         end
                     end
                 else
-                    put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
+                    put!(db_channel, ("page",(word=Token(Symbol("wikt:de"),val.title), page=r)))
                 end
             catch e
                 @warn "save as page $(val.title)" ##exception = e #(e,catch_backtrace())
@@ -93,7 +92,7 @@ end
                     Base.showerror(io, e)
                     println(io, "\n#+end_src")
                 end
-                put!(db_channel, ("page", NamedStruct{:page}((word=Token(Symbol("wikt:de"),val.title), page=r))))
+                put!(db_channel, ("page", (word=Token(Symbol("wikt:de"),val.title), page=r)))
             end
         catch e
             open(errorfile, "a") do io
