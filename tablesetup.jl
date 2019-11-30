@@ -3,40 +3,6 @@ TableAlchemy._db_name(::Type{<:NamedString}) = "Indent"
 using ParserAlchemy.Tokens
 using WikitextParser
 
-clearnames!(results)
-## long compile times in case of many token types -- enable later
-## db_name!(results, NamedString, :Token)
-## db_intern!(results, NamedString)
-db_name!(results, Token, :Token)
-db_intern!(results, Token)
-db_name!(results, LinePrefix{NamedString}, :Prefix)
-db_intern!(results, LinePrefix{NamedString})
-## db_intern!(results, (:type => :Line , :field => :prefix), Vector{NamedString})
-## db_name!(results, Vector{NamedString}, :Prefix)
-db_name!(results, Line{NamedString,AbstractToken}, :Line)
-db_name!(results, Line{NamedString,Token}, :Line)
-db_name!(results, Node{Line{NamedString,AbstractToken}}, :Node)
-db_name!(results, Node{AbstractToken}, :Node) ## Tables
-db_name!(results, WikiLink, :WikiLink)
-db_name!(results, String, :String)
-db_name!(results, Symbol, :Symbol)
-db_name!(results, TemplateParameter, :TemplateParameter)
-db_name!(results, TokenPair{Symbol,Vector{LineContent}}, :TokenPair)
-db_name!(results, Template{NamedString,LineContent}, :Template)
-db_name!(results, Pair{String,Paragraph}, :TemplateArgument)
-db_name!(results, Paragraph{NamedString,LineContent}, :Paragraph)
-db_name!(results, Pair{String,Vector{Line{NamedString,LineContent}}},
-         Symbol("Pair{String,Paragraph}"))
-vector_index!(results, Vector{Token}, :token)
-## vector_index!(results, Vector{TemplateArgument}, :arg) ## index with this -- seems to be occuring as UnionAll, qualified
-vector_index!(results, Vector{LineContent}, :token)
-vector_index!(results, Paragraph{NamedString,Token}, :line)
-## db_name!(results, TableAlchemy.result_type(results,:meaning), nothing)
-results.type_names
-## TableAlchemy.result_type(results,:meaning)
-
-
-
 ## take!(typevecs; log=show_wiki) 
 ## take!(db_channel)
 ## take!(inbox)
@@ -128,4 +94,39 @@ function AbstractTrees.printnode(io::IO, e::Pair{<:Any,M})
     x=e.second
     print(io, x.word, " ", x.order, ": ", rich_lines(x.meaning; typenames=results.type_names))
 end
+
+
+clearnames!(results)
+## long compile times in case of many token types -- enable later
+## db_name!(results, NamedString, :Token)
+## db_intern!(results, NamedString)
+db_name!(results, Token, :Token)
+db_intern!(results, Token)
+db_name!(results, LinePrefix{NamedString}, :Prefix)
+db_intern!(results, LinePrefix{NamedString})
+## db_intern!(results, (:type => :Line , :field => :prefix), Vector{NamedString})
+## db_name!(results, Vector{NamedString}, :Prefix)
+db_name!(results, Line{NamedString,AbstractToken}, :Line)
+db_name!(results, Line{NamedString,Token}, :Line)
+db_name!(results, Line{NamedString,Token}, Symbol("Line{NamedString,Token}"))
+db_name!(results, Node{Line{NamedString,AbstractToken}}, :Node)
+db_name!(results, Node{AbstractToken}, :Node) ## Tables
+db_name!(results, WikiLink, :WikiLink)
+db_name!(results, String, :String)
+db_name!(results, Symbol, :Symbol)
+db_name!(results, TemplateParameter, :TemplateParameter)
+db_name!(results, TokenPair{Symbol,Vector{LineContent}}, :TokenPair)
+db_name!(results, Template{NamedString,LineContent}, :Template)
+db_name!(results, Pair{String,Paragraph}, :TemplateArgument)
+db_name!(results, Paragraph{NamedString,LineContent}, :Paragraph)
+db_name!(results, Pair{String,Vector{Line{NamedString,LineContent}}},
+         Symbol("Pair{String,Paragraph}"))
+vector_index!(results, Vector{Token}, :token)
+## vector_index!(results, Vector{TemplateArgument}, :arg) ## index with this -- seems to be occuring as UnionAll, qualified
+vector_index!(results, Vector{LineContent}, :token)
+vector_index!(results, Paragraph{NamedString,Token}, :line)
+## db_name!(results, TableAlchemy.result_type(results,:meaning), nothing)
+results.type_names
+## TableAlchemy.result_type(results,:meaning)
+
 
