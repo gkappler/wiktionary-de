@@ -67,8 +67,8 @@ end
             ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
             r=tokenize(wt, val.revision.text; partial=:error);
             try
-                if match(r"^(?:Vorlage|Verzeichnis|Hilfe|Kategorie)",val.title) === nothing
-                    ntext = tokenize(wiktionary_defs,r)
+                ntext = tokenize(wiktionary_defs,r; partial=:nothing)
+                if ntext !== nothing && match(r"^(?:Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion)",val.title) === nothing
                     for v in ntext
                         for (w, ms) = wiki_meaning(v)
                             put!(db_channel, ("word", w))
@@ -78,6 +78,7 @@ end
                         end
                     end
                 else
+                    println("save as page ", val.title)
                     put!(db_channel, ("page",(word=Token(Symbol("wikt:de"),val.title), page=r)))
                 end
             catch e
