@@ -62,10 +62,12 @@ end
                            prog=nothing, log = false)
         make_org(s) = replace(s, r"^\*"m => " *")
         val = take!(inbox)
+        print("parsing ", val.title)
         try
             prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
             ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
-            r=tokenize(wt, val.revision.text; partial=:error);
+            r,t = @timed tokenize(wt, val.revision.text; partial=:error);
+            println(", took ", round(t*1000), "ms")
             try
                 ntext = tokenize(wiktionary_defs,r; partial=:nothing)
                 if ntext !== nothing && match(r"^(?:Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion)",val.title) === nothing
@@ -97,7 +99,7 @@ end
             end
         catch e
             open(errorfile, "a") do io
-                println(io, "* wikichunk error in $(val.title)!")
+                println(io, "* wikichunk error in $(val.title)")
                 if e isa ParserAlchemy.PartialMatchException 
                     println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
                     if e.str!=val.revision.text
@@ -114,7 +116,8 @@ end
                 Base.showerror(io, e)
                 println(io, "\n#+end_src")
             end
-            @warn "error" e
+            @warn "error" exception=e val.title
+            sleep(1)
         end
     end
     function process_wikitext(wt,inbox, db_channel)
