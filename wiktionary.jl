@@ -97,11 +97,13 @@ end
         catch e
             open(errorfile, "a") do io
                 println(io, "* wikichunk error in $(val.title)!")
-                println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
-                if e.str!=val.revision.text
-                    println(io, "** subdata\n#+begin_src wikitext\n")
-                    println(io, make_org(e.str))
-                    println(io, "\n#+end_src")
+                if e isa ParserAlchemy.PartialMatchException 
+                    println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
+                    if e.str!=val.revision.text
+                        println(io, "** subdata\n#+begin_src wikitext\n")
+                        println(io, make_org(e.str))
+                        println(io, "\n#+end_src")
+                    end
                 end
                 println(io, "** data\n#+begin_src wikitext\n")
                 println(io, make_org(val.revision.text))
