@@ -108,7 +108,6 @@ db_intern!(results, LinePrefix{NamedString})
 ## db_name!(results, Vector{NamedString}, :Prefix)
 db_name!(results, Line{NamedString,AbstractToken}, :Line)
 db_name!(results, Line{NamedString,Token}, :Line)
-db_name!(results, Line{NamedString,Token}, Symbol("Line{NamedString,Token}"))
 db_name!(results, Node{Line{NamedString,AbstractToken}}, :Node)
 db_name!(results, Node{AbstractToken}, :Node) ## Tables
 db_name!(results, WikiLink, :WikiLink)
