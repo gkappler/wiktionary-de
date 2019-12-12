@@ -30,23 +30,23 @@ end
 #                  tunnel = true,
 #                  dir = "/home/mytree/deploy",
 #                  exename = "/home/mytree/julia-1.1.0/bin/julia")
-
-
 using ProgressMeter
-prog = ProgressUnknown("Wiktionary indexing:")
-dprog = ProgressUnknown("data:")
+prog = Progress(2*930126,"wikt:de entries") # *2 (start, done signals)
+
+
 
 cache_size = 100
 min_mem = 3*10^9
 min_mem_juliadb = 10^9
-@everywhere sleep_time = .001
+state_channel=RemoteChannel(()->Channel(cache_size))
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(cache_size*10))
 
+wc=mc=0
 
+@everywhere sleep_time = .001
 @everywhere errorfile = joinpath(expanduser("~"),"ParserAlchemy.err.org")
-open(errorfile,"w") do io
-end
+
 @everywhere begin
     println("loading FilingForest")
     cd(expanduser("~/dev/julia/"))
@@ -58,77 +58,75 @@ end
     import ProgressMeter
     import ProgressMeter: next!
     import WikitextParser: wikitext
-    function process_entry(wt, inbox, db_channel;
-                           prog=nothing, log = false)
+    function process_entry(wt, inbox, db_channel, state_channel; log = false)
         make_org(s) = replace(s, r"^\*"m => " *")
         val = take!(inbox)
-        print("parsing ", val.title)
+        starttime = time()
+        put!(state_channel, ( myid(), :start, starttime, val.title ))
         if match(r"^(?:Modul):",val.title) !== nothing
             @info "Skipping $(val.title)"
         else
             try
-            prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
-            ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
-            r,t = @timed tokenize(wt, val.revision.text; partial=:error);
-            println(", took ", round(t*1000), "ms")
-            try
-                ntext = tokenize(wiktionary_defs,r; partial=:nothing)
-                if ntext !== nothing && match(r"^(?:Reim|Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion):",val.title) === nothing
-                    for v in ntext
-                        for (w, ms) = wiki_meaning(v)
-                            put!(db_channel, ("word", w))
-                            for m in ms
-                                put!(db_channel, ("meaning", m))
+                r,t = @timed tokenize(wt, val.revision.text; partial=:error);
+                try
+                    ntext = tokenize(wiktionary_defs,r; partial=:nothing)
+                    if ntext !== nothing && match(r"^(?:Reim|Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion):",val.title) === nothing
+                        for v in ntext
+                            for (w, ms) = wiki_meaning(v)
+                                put!(db_channel, ("word", w))
+                                for m in ms
+                                    put!(db_channel, ("meaning", m))
+                                end
                             end
                         end
+                    else
+                        put!(db_channel, ("page",(word=Token(Symbol("wikt:de"),val.title), page=r)))
                     end
-                else
-                    println("save as page ", val.title)
-                    put!(db_channel, ("page",(word=Token(Symbol("wikt:de"),val.title), page=r)))
+                catch e
+                    println("ERROR: save as page ", val.title)
+                    open(errorfile, "a") do io
+                        println(io, "* PAGE $(val.title)!")
+                        println(io, "#+begin_src wikitext\n")
+                        println(io, make_org(val.revision.text))
+                        println(io, "\n#+end_src")
+                        println(io, "** stacktrace")
+                        println(io, "#+begin_src julia\n")
+                        Base.showerror(io, e)
+                        println(io, "\n#+end_src")
+                    end
+                    put!(db_channel, ("page", (word=Token(Symbol("wikt:de"),val.title), page=r)))
                 end
             catch e
-                @warn "save as page $(val.title)" ##exception = e #(e,catch_backtrace())
+                println("ERROR: skipping ", val.title)
                 open(errorfile, "a") do io
-                    println(io, "* PAGE $(val.title)!")
-                    println(io, "#+begin_src wikitext\n")
+                    println(io, "* wikichunk error in $(val.title)")
+                    if e isa ParserAlchemy.PartialMatchException 
+                        println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
+                        if e.str!=val.revision.text
+                            println(io, "** subdata\n#+begin_src wikitext\n")
+                            println(io, make_org(e.str))
+                            println(io, "\n#+end_src")
+                        end
+                    end
+                    println(io, "** data\n#+begin_src wikitext\n")
                     println(io, make_org(val.revision.text))
                     println(io, "\n#+end_src")
                     println(io, "** stacktrace")
-                    println(io, "#+begin_src julia\n")
+                    println(io, "** subdata\n#+begin_src julia\n")
                     Base.showerror(io, e)
                     println(io, "\n#+end_src")
                 end
-                put!(db_channel, ("page", (word=Token(Symbol("wikt:de"),val.title), page=r)))
+                sleep(1)
             end
-        catch e
-            open(errorfile, "a") do io
-                println(io, "* wikichunk error in $(val.title)")
-                if e isa ParserAlchemy.PartialMatchException 
-                    println(io, "#+begin_src wikitext\n",make_org(context(e)),"\n#+end_src")
-                    if e.str!=val.revision.text
-                        println(io, "** subdata\n#+begin_src wikitext\n")
-                        println(io, make_org(e.str))
-                        println(io, "\n#+end_src")
-                    end
-                end
-                println(io, "** data\n#+begin_src wikitext\n")
-                println(io, make_org(val.revision.text))
-                println(io, "\n#+end_src")
-                println(io, "** stacktrace")
-                println(io, "** subdata\n#+begin_src julia\n")
-                Base.showerror(io, e)
-                println(io, "\n#+end_src")
-            end
-            @warn "error" exception=e val.title
-            sleep(1)
-         end
         end
+        put!(state_channel, ( myid(), :done, time()-starttime, val.title ))
     end
-    function process_wikitext(wt,inbox, db_channel)
+    function process_wikitext(wt,inbox, db_channel,state_channel)
+        @info "compiling" maxlog=1
+        tokenize(wt,"a{{{b}}}[[c]]")
+        @info "compiling done" maxlog=1
         while isopen(inbox) || isready(inbox)
-            @info "compiling" maxlog=1
-            process_entry(wt,inbox, db_channel)
-            @info "compiling done" maxlog=1
+            process_entry(wt,inbox, db_channel,state_channel)
             sleep(sleep_time)
         end
     end
@@ -137,7 +135,6 @@ end
 
 @info "start loading"
 
-wc=mc=0
 @everywhere function process_xml(inbox, db_channel; progress=nothing)
     try
         parse_bz2(expanduser("~/data/dewiktionary-latest-pages-articles.xml.bz2")) do val, counter
@@ -155,7 +152,10 @@ wc=mc=0
     # end
     # close(db_channel)
 end
+
 ## bind(inbox, read_task) ## close inbox when reading is done
+open(errorfile,"w") do io
+end
 
 #parse_task = @async
 xml_worker, page_workers = if workers()!=[1]
@@ -165,27 +165,35 @@ else
 end
 
 @async xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
-
-
 wt=wikitext(namespace = "wikt:de");
 
 for p in page_workers## [1:end-1]
-    remotecall(process_wikitext, p, wt, inbox, db_channel)
+    remotecall(process_wikitext, p, wt, inbox, db_channel,state_channel)
 end
 
 
-
-typevecs=TypePartitionChannel(db_channel,10000)
-show_wiki(x) = let w=x.word, m=haskey(x,:meaning) ? ": $(x.meaning)" : ""
-    r = "$w$m"
-    if lastindex(r)>60        
-        r[1:nextind(r,60)]
-    else
-        r
+function monitor(prog,state_channel; timeout=60)
+    states=Dict{Int, Tuple{Symbol,Float64,String}}()
+    while isopen(state_channel)
+        while isready(state_channel)
+            pid, status, t, title = take!(state_channel)
+            states[pid] = (status, t, title)
+            ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? t-time() : t )*1000)) ms") for (pid, (status, t, title)) in states)...,
+                                                   (:mem_GB, Sys.free_memory()/10^9) ])
+        end
+        for (pid, (status, t, title)) in pairs(states)
+            if status == :start && time()-t>timeout
+                interrupt(pid)
+                @warn "interrupting $title on pid $pid"
+            end
+        end
+        sleep(1)
     end
-    ProgressMeter.next!(dprog; showvalues=[(:entry, r), (:mem_GB, Sys.free_memory()/10^9) ])
 end
 
+mtask = @async monitor(prog, state_channel)
+
+typevecs = TypePartitionChannel(db_channel,10)
 
 import Dates
 datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
@@ -199,7 +207,8 @@ include("tablesetup.jl")
 
 
 while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
-    global target,v_ = take!(typevecs; log=show_wiki);
+
+    global target,v_ = take!(typevecs);
     global v = token_lines.(v_);
     @info "indexing $(length(v)) $(target)"
     if Sys.free_memory() < min_mem_juliadb
