@@ -63,14 +63,17 @@ end
         make_org(s) = replace(s, r"^\*"m => " *")
         val = take!(inbox)
         print("parsing ", val.title)
-        try
+        if match(r"^(?:Modul):",val.title) !== nothing
+            @info "Skipping $(val.title)"
+        else
+            try
             prog !== nothing && ProgressMeter.next!(prog; showvalues=[(:parsing, val.title)])
             ## print(val.revision.text) ## todo: html tags in wikitext are with newlines from libexpat...
             r,t = @timed tokenize(wt, val.revision.text; partial=:error);
             println(", took ", round(t*1000), "ms")
             try
                 ntext = tokenize(wiktionary_defs,r; partial=:nothing)
-                if ntext !== nothing && match(r"^(?:Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion)",val.title) === nothing
+                if ntext !== nothing && match(r"^(?:Reim|Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion):",val.title) === nothing
                     for v in ntext
                         for (w, ms) = wiki_meaning(v)
                             put!(db_channel, ("word", w))
@@ -118,6 +121,7 @@ end
             end
             @warn "error" exception=e val.title
             sleep(1)
+         end
         end
     end
     function process_wikitext(wt,inbox, db_channel)
