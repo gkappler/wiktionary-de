@@ -189,7 +189,7 @@ function monitor(prog,state_channel; timeout=240)
                 haskey(states, pid) ? states[pid][1] : 0
             end
             states[pid] = (n, status, t, title)
-            ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? time()-t : t )*1000)) ms") for (pid, (status, t, title)) in states)...,
+            ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? time()-t : t )*1000)) ms") for (pid, (n, status, t, title)) in states)...,
                                                    (:mem_GB, Sys.free_memory()/10^9) ])
         end
         for (pid, (n, status, t, title)) in pairs(states)
