@@ -152,11 +152,7 @@ end
     catch e
         @error "xml parsing" exception=e
     end
-    # close(inbox)
-    # while isready(inbox) || isready(db_channel)
-    #     sleep(1)
-    # end
-    # close(db_channel)
+    close(inbox)
 end
 
 ## bind(inbox, read_task) ## close inbox when reading is done
