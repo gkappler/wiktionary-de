@@ -164,13 +164,13 @@ open(errorfile,"w") do io
 end
 
 #parse_task = @async
-xml_worker, page_workers = if workers()!=[1]
+save_worker, page_workers = if workers()!=[1]
     workers()[1], workers()[2:end]
 else
     1, workers()
 end
 
-@async xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
+xml_task = @async process_xml(inbox, db_channel)
 wt=wikitext(namespace = "wikt:de");
 
 for p in page_workers## [1:end-1]
@@ -220,18 +220,18 @@ include("tablesetup.jl")
 
 dryrun = false
 
-function save(results, typevecs)
+function save_results(results, typevecs)
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
         global target,v_ = take!(typevecs);
-        info(logger,"saving data, free memory $(Sys.free_memory()/10^9)")
+        @info "saving data, free memory $(Sys.free_memory()/10^9)"
 
         ## todo: make preprocess/postprocess function
         global v = token_lines.(v_);
         @info "indexing $(length(v)) $(target)"
         if Sys.free_memory() < min_mem_juliadb
             TableAlchemy.save(results)
-            info(logger,"saved data, free memory $(Sys.free_memory()/10^9)")
+            @info "saved data, free memory $(Sys.free_memory()/10^9)"
         end
 
         db_name!(results, eltype(v), target)
@@ -245,7 +245,7 @@ function save(results, typevecs)
         Sys.GC.gc()
     end
 end
-savetask = @async save(results,typevecs)
+savetask = remote_do(save_worker, save_results, results, typevecs)
 monitor(prog, state_channel)
 
 TableAlchemy.save(results)
