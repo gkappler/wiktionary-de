@@ -16,12 +16,14 @@ using Distributed
 @everywhere    Pkg.resolve()
 @everywhere    Pkg.instantiate()
 @everywhere begin
-    println("loading TableAlchemy")
+    using Memento
+    logger = getlogger("wiktionary pid $(myid())")
+    info(logger,"loading TableAlchemy")
     cd(expanduser("~/dev/julia/"))
     using TableAlchemy
     using ParserAlchemy
     using ParserAlchemy.Tokens
-    println("worker ready")
+    info(logger,"worker ready")
 end
 
 
@@ -48,7 +50,7 @@ wc=mc=0
 @everywhere errorfile = joinpath(expanduser("~"),"ParserAlchemy.err.org")
 
 @everywhere begin
-    println("loading FilingForest")
+    debug(logger,"loading FilingForest")
     cd(expanduser("~/dev/julia/"))
     using FilingForest
     using ParserAlchemy
@@ -83,7 +85,7 @@ wc=mc=0
                         put!(db_channel, ("page",(word=Token(Symbol("wikt:de"),val.title), page=r)))
                     end
                 catch e
-                    println("ERROR: save as page ", val.title)
+                    error(logger,"save as page $(val.title)")
                     open(errorfile, "a") do io
                         println(io, "* PAGE $(val.title)!")
                         println(io, "#+begin_src wikitext\n")
@@ -97,7 +99,7 @@ wc=mc=0
                     put!(db_channel, ("page", (word=Token(Symbol("wikt:de"),val.title), page=r)))
                 end
             catch e
-                println("ERROR: skipping ", val.title)
+                error(logger,"skipping $(val.title)")
                 open(errorfile, "a") do io
                     println(io, "* wikichunk error in $(val.title)")
                     if e isa ParserAlchemy.PartialMatchException 
@@ -126,11 +128,15 @@ wc=mc=0
         tokenize(wt,"a{{{b}}}[[c]]")
         @info "compiling done" maxlog=1
         while isopen(inbox) || isready(inbox)
-            process_entry(wt,inbox, db_channel,state_channel)
+            try 
+                process_entry(wt,inbox, db_channel,state_channel)
+            catch e
+                error(logger,e)
+            end
             sleep(sleep_time)
         end
     end
-    println("worker ready")
+    info(logger,"worker ready")
 end
 
 @info "start loading"
