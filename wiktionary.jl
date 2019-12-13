@@ -212,7 +212,7 @@ include("tablesetup.jl")
 
 
 
-dryrun = true
+dryrun = false
 
 function save(results, typevecs)
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
