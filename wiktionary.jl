@@ -132,7 +132,7 @@ wc=mc=0
                 process_entry(wt,inbox, db_channel,state_channel)
                 sleep(sleep_time)
             catch e
-                error(logger,e)
+                println("$e")
             end
         end
     end
