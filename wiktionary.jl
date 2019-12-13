@@ -178,16 +178,21 @@ for p in page_workers## [1:end-1]
 end
 
 
-function monitor(prog,state_channel; timeout=1)
-    states=Dict{Int, Tuple{Symbol,Float64,String}}()
+function monitor(prog,state_channel; timeout=240)
+    states=Dict{Int, Tuple{Int,Symbol,Float64,String}}()
     while isopen(state_channel)
         while isready(state_channel)
             pid, status, t, title = take!(state_channel)
-            states[pid] = (status, t, title)
+            n = if status == :done
+                haskey(states, pid) ? states[pid][1] + 1 : 1
+            else
+                haskey(states, pid) ? states[pid][1] : 0
+            end
+            states[pid] = (n, status, t, title)
             ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? time()-t : t )*1000)) ms") for (pid, (status, t, title)) in states)...,
                                                    (:mem_GB, Sys.free_memory()/10^9) ])
         end
-        for (pid, (status, t, title)) in pairs(states)
+        for (pid, (n, status, t, title)) in pairs(states)
             if status == :start && time()-t>timeout
                 interrupt(pid)
                 @warn "interrupting $title on pid $pid"
