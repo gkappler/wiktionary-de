@@ -191,6 +191,7 @@ function monitor(prog,state_channel; timeout=1)
             if status == :start && time()-t>timeout
                 interrupt(pid)
                 @warn "interrupting $title on pid $pid"
+                delete!(states, pid)
             end
         end
         sleep(.1)
