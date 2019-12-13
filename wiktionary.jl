@@ -172,13 +172,13 @@ for p in page_workers## [1:end-1]
 end
 
 
-function monitor(prog,state_channel; timeout=60)
+function monitor(prog,state_channel; timeout=240)
     states=Dict{Int, Tuple{Symbol,Float64,String}}()
     while isopen(state_channel)
         while isready(state_channel)
             pid, status, t, title = take!(state_channel)
             states[pid] = (status, t, title)
-            ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? t-time() : t )*1000)) ms") for (pid, (status, t, title)) in states)...,
+            ProgressMeter.next!(prog; showvalues=[ ( (Symbol("pid$pid"), "$title - $status, $(trunc( ( status == :start ? time()-t : t )*1000)) ms") for (pid, (status, t, title)) in states)...,
                                                    (:mem_GB, Sys.free_memory()/10^9) ])
         end
         for (pid, (status, t, title)) in pairs(states)
@@ -191,7 +191,6 @@ function monitor(prog,state_channel; timeout=60)
     end
 end
 
-mtask = @async monitor(prog, state_channel)
 
 typevecs = TypePartitionChannel(db_channel,10000)
 
@@ -206,32 +205,36 @@ dryrun = false
 include("tablesetup.jl")
 
 
-while isready(typevecs) || isopen(typevecs) || isopen(inbox)  || isopen(db_channel)
 
-    global target,v_ = take!(typevecs);
-    global v = token_lines.(v_);
-    @info "indexing $(length(v)) $(target)"
-    if Sys.free_memory() < min_mem_juliadb
-        @info "saving data, free memory" (:mem_GB, Sys.free_memory()/10^9)
-        TableAlchemy.save(results)
-        @info "saved data" (:mem_GB, Sys.free_memory()/10^9)
+dryrun = true
+
+function save(results, typevecs)
+    while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
+
+        global target,v_ = take!(typevecs);
+        info(logger,"saving data, free memory $(Sys.free_memory()/10^9)")
+
+        ## todo: make preprocess/postprocess function
+        global v = token_lines.(v_);
+        @info "indexing $(length(v)) $(target)"
+        if Sys.free_memory() < min_mem_juliadb
+            TableAlchemy.save(results)
+            info(logger,"saved data, free memory $(Sys.free_memory()/10^9)")
+        end
+
+        db_name!(results, eltype(v), target)
+        pkeys_tuple!(results, eltype(v), :word, :numid)
+        if !dryrun
+            db, ks, jk = TableAlchemy.push_pkeys!(
+                results,
+                emptykeys(v), TypedIterator(v));
+        end
+        v = nothing
+        Sys.GC.gc()
     end
-
-    db_name!(results, eltype(v), target)
-    # try
-    pkeys_tuple!(results, eltype(v), :word, :numid)
-    if !dryrun
-        db, ks, jk = TableAlchemy.push_pkeys!(
-            results,
-            emptykeys(v), TypedIterator(v));
-    end
-    v = nothing
-    Sys.GC.gc()
-
-    # catch e
-    #     @error "cannot push into db" exception=e
-    # end
 end
+savetask = @async save(results,typevecs)
+monitor(prog, state_channel)
 
 TableAlchemy.save(results)
 
