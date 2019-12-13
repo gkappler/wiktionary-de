@@ -130,10 +130,10 @@ wc=mc=0
         while isopen(inbox) || isready(inbox)
             try 
                 process_entry(wt,inbox, db_channel,state_channel)
+                sleep(sleep_time)
             catch e
                 error(logger,e)
             end
-            sleep(sleep_time)
         end
     end
     info(logger,"worker ready")
@@ -178,7 +178,7 @@ for p in page_workers## [1:end-1]
 end
 
 
-function monitor(prog,state_channel; timeout=240)
+function monitor(prog,state_channel; timeout=1)
     states=Dict{Int, Tuple{Symbol,Float64,String}}()
     while isopen(state_channel)
         while isready(state_channel)
@@ -193,7 +193,7 @@ function monitor(prog,state_channel; timeout=240)
                 @warn "interrupting $title on pid $pid"
             end
         end
-        sleep(1)
+        sleep(.1)
     end
 end
 
