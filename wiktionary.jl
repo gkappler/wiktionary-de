@@ -170,7 +170,7 @@ else
     1, workers()
 end
 
-xml_task = @async process_xml(inbox, db_channel)
+xml_task = remote_do(process_xml, save_worker, inbox, db_channel)
 wt=wikitext(namespace = "wikt:de");
 
 for p in page_workers## [1:end-1]
@@ -220,7 +220,7 @@ include("tablesetup.jl")
 
 dryrun = false
 
-function save_results(results, typevecs)
+@everywhere function save_results(results, typevecs)
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
         global target,v_ = take!(typevecs);
@@ -245,7 +245,7 @@ function save_results(results, typevecs)
         Sys.GC.gc()
     end
 end
-savetask = remote_do(save_worker, save_results, results, typevecs)
+savetask = remote_do(save_results, save_worker, results, typevecs)
 monitor(prog, state_channel)
 
 TableAlchemy.save(results)
