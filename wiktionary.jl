@@ -160,13 +160,13 @@ open(errorfile,"w") do io
 end
 
 #parse_task = @async
-save_worker, page_workers = if workers()!=[1]
-    workers()[1], workers()[2:end]
+xml_worker, save_worker, page_workers = if length(workers())>=3
+    workers()[1], workers()[2], workers()[3:end]
 else
-    1, workers()
+    1, 1, workers()
 end
 
-xml_task = remote_do(process_xml, save_worker, inbox, db_channel)
+xml_task = remote_do(process_xml, xml_worker, inbox, db_channel)
 wt=wikitext(namespace = "wikt:de");
 
 for p in page_workers## [1:end-1]
@@ -214,7 +214,7 @@ datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
     output = expanduser("~/database/wiktionary-$datetimenow")
     mkpath(output)
     results = TypeDB(output)
-    include("/home/gregor/dev/julia/wiktionary/tablesetup.jl")
+    include("tablesetup.jl")
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
         global target,v_ = take!(typevecs);
@@ -241,7 +241,7 @@ datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
     end
 end
 
-savetask = remote_do(save_results, save_worker, results, db_channel)
+savetask = remote_do(save_results, save_worker, datetimenow, db_channel)
 monitor(prog, state_channel)
 
 TableAlchemy.save(results)
