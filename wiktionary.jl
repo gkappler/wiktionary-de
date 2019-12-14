@@ -200,23 +200,21 @@ function monitor(prog,state_channel; timeout=240)
 end
 
 
-typevecs = TypePartitionChannel(db_channel,10000)
+
+
 
 import Dates
 datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
-output = expanduser("~/database/wiktionary-$datetimenow")
-mkpath(output)
-results = TypeDB(output)
-
-
-dryrun = false
-include("tablesetup.jl")
 
 
 
-dryrun = false
 
-@everywhere function save_results(results, typevecs)
+@everywhere function save_results(datetimenow, db_channel; dryrun = false)
+    typevecs = TypePartitionChannel(db_channel,10000)
+    output = expanduser("~/database/wiktionary-$datetimenow")
+    mkpath(output)
+    results = TypeDB(output)
+    include("/home/gregor/dev/julia/wiktionary/tablesetup.jl")
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
         global target,v_ = take!(typevecs);
@@ -239,9 +237,11 @@ dryrun = false
         end
         v = nothing
         Sys.GC.gc()
+        sleep(1)
     end
 end
-savetask = remote_do(save_results, save_worker, results, typevecs)
+
+savetask = remote_do(save_results, save_worker, results, db_channel)
 monitor(prog, state_channel)
 
 TableAlchemy.save(results)
