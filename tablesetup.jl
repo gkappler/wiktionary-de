@@ -7,28 +7,30 @@ using WikitextParser
 ## take!(db_channel)
 ## take!(inbox)
 import ParserAlchemy.Tokens: token_lines
-token_lines(x::NamedTuple{ns,ts}; typenames=results.type_names) where {ns,ts} =
+token_lines(x::NamedTuple{ns,ts}; typenames) where {ns,ts} =
     (; ( ( n => token_lines(getproperty(x,n); typenames=typenames))
          for (n,t) in zip(ns, fieldtypes(ts)) )...
      )
-token_lines(x::NamedStruct{name}; typenames=results.type_names) where {name} =
+token_lines(x::NamedStruct{name}; typenames) where {name} =
     NamedStruct{name}(token_lines(get(x); typenames=typenames))
 
 token_lines(x; kw...) = x
+## token_lines(x::Union{Token, String}; kw...) = x
 
-rich_lines(x::NamedTuple{ns,ts};typenames=Main.results.type_names, kw...)  where {ns,ts} =
+rich_lines(x::NamedTuple{ns,ts};typenames, kw...)  where {ns,ts} =
     (; ( ( n => rich_lines(getproperty(x,n); typenames=typenames, kw...))
          for (n,t) in zip(ns, fieldtypes(ts)) )...
      )
-rich_lines(x::NamedStruct{name}; typenames=Main.results.type_names, kw...) where {name} =
+
+rich_lines(x::NamedStruct{name}; typenames, kw...) where {name} =
     NamedStruct{name}(rich_lines(get(x); typenames=typenames, kw...))
 
 rich_lines(x; kw...) = x
 
-rich_lines(x::Paragraph{NamedString,Token}; typenames=Main.results.type_names, kw...) =
+rich_lines(x::Paragraph{NamedString,Token}; typenames, kw...) =
     unnest_lines(nested_wrap_types(nested(x); typenames=typenames, kw...))
 
-rich_lines(x::TableAlchemy.IndexedVector{name}; typenames=Main.results.type_names, kw...) where name =
+rich_lines(x::TableAlchemy.IndexedVector{name}; typenames, kw...) where name =
     rich_lines(x.data; typenames=typenames, kw...)
 
 
@@ -52,7 +54,11 @@ function Base.show(io::IO, x::M)
             v = getproperty(x,p)
             if !(v isa AbstractVector{<:Line} && isempty(v))
                 println(io,"== ",p," ==")
-                println(io,rich_lines(v; typenames=results.type_names))
+                try
+                    println(io,rich_lines(v; typenames=results.type_names))
+                catch e
+                    @error "rich_lines error" exception=e
+                end
             end
         end
     end
@@ -67,7 +73,11 @@ function Base.show(io::IO, x::W)
             v = getproperty(x,p)
             if !(v isa AbstractVector{<:Line} && isempty(v))
                 println(io,"== ",p," ==")
-                println(io,rich_lines(v; typenames=results.type_names))
+                try
+                    println(io,rich_lines(v; typenames=results.type_names))
+                catch e
+                    @error "rich_lines error" exception=e
+                end
             end
         end
     end
@@ -96,6 +106,8 @@ function AbstractTrees.printnode(io::IO, e::Pair{<:Any,M})
 end
 
 
+function WikiDB(output)
+    results = TypeDB(output)
 clearnames!(results)
 ## long compile times in case of many token types -- enable later
 ## db_name!(results, NamedString, :Token)
@@ -127,5 +139,5 @@ vector_index!(results, Paragraph{NamedString,Token}, :line)
 ## db_name!(results, TableAlchemy.result_type(results,:meaning), nothing)
 results.type_names
 ## TableAlchemy.result_type(results,:meaning)
-
+end
 

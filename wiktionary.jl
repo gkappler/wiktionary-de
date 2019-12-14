@@ -208,20 +208,20 @@ datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
 
 
 
+@everywhere include("wiktionary/tablesetup.jl")
 
 @everywhere function save_results(datetimenow, db_channel; dryrun = false)
-    typevecs = TypePartitionChannel(db_channel,10000)
     output = expanduser("~/database/wiktionary-$datetimenow")
     mkpath(output)
-    results = TypeDB(output)
-    include("tablesetup.jl")
+    results = WikiDB(output)
+    typevecs = TypePartitionChannel(db_channel,10000)
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
         global target,v_ = take!(typevecs);
         @info "saving data, free memory $(Sys.free_memory()/10^9)"
 
         ## todo: make preprocess/postprocess function
-        global v = token_lines.(v_);
+        global v = token_lines.(v_; typenames=results.type_names);
         @info "indexing $(length(v)) $(target)"
         if Sys.free_memory() < min_mem_juliadb
             TableAlchemy.save(results)
