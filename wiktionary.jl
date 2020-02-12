@@ -74,7 +74,7 @@ wc=mc=0
                     ntext = tokenize(wiktionary_defs,r; partial=:nothing)
                     if ntext !== nothing && match(r"^(?:Reim|Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion):",val.title) === nothing
                         for v in ntext
-                            for (w, ms) = wiki_meaning(v)
+                            for (w, ms) = wiki_meaning(v.title,v)
                                 put!(db_channel, ("word", w))
                                 for m in ms
                                     put!(db_channel, ("meaning", m))
@@ -213,7 +213,8 @@ datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
 @everywhere function save_results(datetimenow, db_channel; dryrun = false)
     output = expanduser("~/database/wiktionary-$datetimenow")
     mkpath(output)
-    results = WikiDB(output)
+    results = TypeDB(output)
+    WikiDB!(results)
     typevecs = TypePartitionChannel(db_channel,10000)
     while isready(typevecs) || isopen(typevecs)## || isopen(inbox)  || isopen(db_channel)
 
