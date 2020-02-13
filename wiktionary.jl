@@ -239,6 +239,9 @@ datetimenow = Dates.format(Dates.now(),"Y-mm-dd_HHhMM")
         Sys.GC.gc()
         sleep(1)
     end
+    @info "saving"
+    TableAlchemy.save(results)
+    @info "done saving"
 end
 
 savetask = remote_do(save_results, save_worker, datetimenow, db_channel)
