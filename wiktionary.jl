@@ -38,8 +38,7 @@ prog = Progress(2*930126,"wikt:de entries") # *2 (start, done signals)
 
 
 cache_size = 100
-min_mem = 3*10^9
-min_mem_juliadb = 10^9
+@everywhere min_mem_juliadb = 10^9
 state_channel=RemoteChannel(()->Channel(cache_size*10))
 inbox=RemoteChannel(()->Channel(cache_size))
 db_channel = RemoteChannel(()->Channel(100*cache_size))
