@@ -74,7 +74,7 @@ wc=mc=0
                     ntext = tokenize(wiktionary_defs,r; partial=:nothing)
                     if ntext !== nothing && match(r"^(?:Reim|Vorlage|Verzeichnis|Hilfe|Kategorie|Flexion):",val.title) === nothing
                         for v in ntext
-                            for (w, ms) = wiki_meaning(v.title,v)
+                            for (w, ms) = wiki_meaning(val.title,v)
                                 put!(db_channel, ("word", w))
                                 for m in ms
                                     put!(db_channel, ("meaning", m))
